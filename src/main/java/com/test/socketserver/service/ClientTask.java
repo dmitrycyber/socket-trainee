@@ -12,7 +12,8 @@ import java.util.stream.Collectors;
 
 @Slf4j
 public class ClientTask implements Runnable {
-    @Getter @Setter
+    @Getter
+    @Setter
     private Long userId;
     private InputStream inputStream;
     private OutputStream outputStream;
@@ -29,48 +30,57 @@ public class ClientTask implements Runnable {
     @Override
     public void run() {
         readMessage();
-        writeMessage();
     }
 
     private void readMessage() {
-        byte[] buffer = new byte[1024];
+        byte[] buffer;
         String resultMessage = null;
-        int read;
         try {
+            int bytesToRead = inputStream.available();
+
+            if (bytesToRead > 0){
+                buffer = getBytesFromInputStream();
+                resultMessage = new String(buffer, 0, bytesToRead, StandardCharsets.UTF_8);
+            }
+
             while (userId == null) {
-                while ((read = inputStream.read(buffer)) != -1) {
-                    resultMessage = new String(buffer, 0, read);
+                if (resultMessage != null) {
+                    log.info("Register user message " + resultMessage);
+                    messageDispatcher.register(resultMessage, this);
                 }
 
-                log.info("Register message " + resultMessage);
-
-                messageDispatcher.register(resultMessage, this);
+                resultMessage = null;
             }
 
-            while ((read = inputStream.read(buffer)) != -1) {
-                resultMessage = new String(buffer, 0, read);
-            }
+            messageDispatcher.processMessage(resultMessage, userId);
 
-            //TODO send dto with userId to message dispatcher
-
-
-//            if (inputStream.read() > 0){
-//                Reader in = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
-//                for (int numRead; (numRead = in.read(buffer, 0, buffer.length)) > 0;) {
-//                    sb.append(buffer, 0, numRead);
-//                }
-//                resultMessage = sb.toString();
-//            }
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
-        log.info("RESULT MESSAGE " + resultMessage);
-        //TODO send to message dispatcher
     }
 
-    private void writeMessage() {
+    private byte[] getBytesFromInputStream(){
+        byte[] buffer = new byte[4096];
 
+        try {
+            int bytesToRead = inputStream.available();
+
+            if (bytesToRead > 0) {
+                inputStream.read(buffer, 0, bytesToRead);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return buffer;
+    }
+
+    public void writeMessage(String message) throws IOException {
+        synchronized (ClientTask.class){
+            if (outputStream != null){
+                outputStream.write(message.getBytes(StandardCharsets.UTF_8));
+            }
+        }
     }
 }

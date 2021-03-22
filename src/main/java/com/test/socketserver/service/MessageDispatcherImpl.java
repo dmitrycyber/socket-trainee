@@ -20,50 +20,42 @@ import java.util.Map;
 @Slf4j
 public class MessageDispatcherImpl implements MessageDispatcher {
     private static final Map<Long, ClientTask> tasks = Collections.synchronizedMap(new HashMap<>());
-    private ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     @Override
     @SneakyThrows
     public void register(String message, ClientTask clientTask) {
         Wrapper<?> wrapper = defineMessage(message);
-//        Wrapper<Object> wrapper = objectMapper.readValue(message, new TypeReference<>() {
-//        });
 
-//        if (wrapper.getMessageType().equals(SocketMessageType.REGISTER)) {
-            try {
+        if (wrapper != null){
+            log.info("Current client tasks: " + tasks);
 
+            log.info("Message from socket " + wrapper.getMessage());
 
-                log.info("Current client tasks: " + tasks);
+            UserDto userDto = (UserDto) wrapper.getMessage();
+            Long userId = userDto.getUserId();
 
-                log.info("Message from socket " + wrapper.getMessage());
+            clientTask.setUserId(userId);
+            tasks.put(userId, clientTask);
 
-                UserDto userDto = (UserDto) wrapper.getMessage();
-//                UserDto userDto = objectMapper.readValue(wrapper.getMessage().toString(), UserDto.class);
-
-                Long userId = userDto.getUserId();
-
-                clientTask.setUserId(userId);
-                tasks.put(userId, clientTask);
-
-                log.info(String.format("User %d registered", userId));
-                log.info("Current client tasks: " + tasks);
-            }catch (Exception e){
-                e.printStackTrace();
-            }
-//        }
+            log.info(String.format("User %d registered", userId));
+            log.info("Current client tasks: " + tasks);
+        }
     }
 
     @Override
-    public void processMessage(String message) {
-
+    public void processMessage(String message, Long userId) {
+        //TODO add task to queue before execute
     }
 
     @SneakyThrows
     private Wrapper<?> defineMessage(String message) {
-        Wrapper<Object> wrapper = objectMapper.readValue(message, new TypeReference<Wrapper<Object>>() {});
+        Wrapper<Object> wrapper = objectMapper.readValue(message, new TypeReference<>() {
+        });
 
-        if (wrapper.getMessageType().equals(SocketMessageType.REGISTER)){
-            return objectMapper.readValue(message, new TypeReference<Wrapper<UserDto>>() {});
+        if (wrapper.getMessageType().equals(SocketMessageType.REGISTER)) {
+            return objectMapper.readValue(message, new TypeReference<Wrapper<UserDto>>() {
+            });
         }
 
 
